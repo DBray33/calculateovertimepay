@@ -328,7 +328,7 @@
           <head>
             <title>Even Bill Split - ${today}</title>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; color: #1f2937; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 60px; margin: 0; color: #1f2937; }
               h1 { font-size: 24px; margin-bottom: 8px; }
               .date { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
               .summary-box { background: #FFF7ED; border: 1px solid #fed7aa; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
@@ -338,7 +338,7 @@
               .label { color: #6b7280; }
               .value { font-weight: 600; }
               .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
-              @media print { body { padding: 20px; } }
+              @media print { body { padding: 20px 40px; } @page { margin: 0.5in; } }
             </style>
           </head>
           <body>
@@ -1815,7 +1815,7 @@
           <head>
             <title>${scenarioName} - ${today}</title>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; max-width: 700px; margin: 0 auto; color: #1f2937; font-size: 14px; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 60px; margin: 0; color: #1f2937; font-size: 14px; }
               h1 { font-size: 24px; margin-bottom: 4px; }
               h2 { font-size: 16px; margin: 24px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #F54900; }
               h3.section-title { font-size: 14px; margin: 16px 0 8px; color: #6b7280; }
@@ -1842,7 +1842,7 @@
               .settlement-box li { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.2); }
               .settlement-box li:last-child { border-bottom: none; }
               .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center; }
-              @media print { body { padding: 20px; } }
+              @media print { body { padding: 20px 40px; } @page { margin: 0.5in; } }
             </style>
           </head>
           <body>
