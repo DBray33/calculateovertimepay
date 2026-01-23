@@ -947,6 +947,22 @@ input[type="number"].error {
   font-weight: 700;
 }
 
+.settlement-section .btn-copy {
+  margin-top: 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--color-white);
+}
+
+.settlement-section .btn-copy:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.settlement-section .btn-copy.copied {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-primary);
+}
+
 /* ============================================
    Fair Split (Scenarios) Calculator
    ============================================ */

@@ -379,6 +379,7 @@
                   <h3>Expenses</h3>
                   <button class="btn btn-secondary btn-sm" id="add-group-expense-item-btn">+ Add Expense</button>
                 </div>
+                <p class="section-hint">Add each expense, who it's split between, and who paid for it.</p>
                 <div class="items-list" id="group-expense-items-list">
                   <div class="item-row" data-item-id="0">
                     <div class="item-details">
@@ -401,16 +402,11 @@
                       <div class="checkbox-group" id="group-expense-item-participants-0"></div>
                       <span class="item-error" id="group-expense-item-error-0"></span>
                     </div>
+                    <div class="item-payers" data-item-id="0">
+                      <span class="participants-label">Paid by:</span>
+                      <div class="payer-bubble-group" id="group-expense-payers-0"></div>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <!-- Payer Section -->
-              <div class="scenario-section">
-                <div class="form-group">
-                  <label>Who paid?</label>
-                  <p class="section-hint">Select all people who contributed to the payment.</p>
-                  <div class="payer-bubble-group" id="group-expense-payers"></div>
                 </div>
               </div>
 
@@ -487,6 +483,7 @@
               <div class="settlement-section">
                 <h3>Settlement Plan</h3>
                 <ul class="settlement-list" id="fair-split-settlements"></ul>
+                <button class="btn-copy" id="copy-fair-split-result" aria-label="Copy settlement">Copy Settlement</button>
               </div>
             </div>
           </div>

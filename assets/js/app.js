@@ -288,7 +288,18 @@
 
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        copyToClipboard(resultValue.textContent, copyBtn);
+        const billTotal = parseFloat(billTotalInput.value) || 0;
+        const numPeople = parseInt(numPeopleInput.value) || 0;
+        const perPerson = resultValue.textContent;
+
+        let text = '📊 Even Bill Split\n';
+        text += '─────────────────\n';
+        text += `Total: ${formatCurrency(billTotal)}\n`;
+        text += `People: ${numPeople}\n`;
+        text += `Each person pays: ${perPerson}\n`;
+        text += '\n📱 Calculate your own split at splitbillsfairly.com';
+
+        copyToClipboard(text, copyBtn);
       });
     }
 
@@ -324,7 +335,6 @@
     // Group Expense-specific
     const groupExpenseItemsList = $('group-expense-items-list');
     const addGroupExpenseItemBtn = $('add-group-expense-item-btn');
-    const groupExpensePayersEl = $('group-expense-payers');
 
     // Trip-specific
     const lodgingItemsList = $('lodging-items-list');
@@ -351,8 +361,7 @@
         payers: { 0: 0 } // personId: amountPaid (0 means they paid the whole thing if only one selected)
       },
       groupExpense: {
-        items: [{ id: 0, name: '', amount: 0, qty: 1, participants: [0, 1] }],
-        payers: { 0: 0 }
+        items: [{ id: 0, name: '', amount: 0, qty: 1, participants: [0, 1], payers: { 0: 0 } }]
       },
       trip: {
         lodgingItems: [],
@@ -379,6 +388,26 @@
     function getPersonName(id) {
       const person = state.people.find(p => p.id === id);
       return person ? person.name : 'Unknown';
+    }
+
+    /**
+     * Distribute total cents among participants with proper remainder handling.
+     * Returns an object mapping participant ID to their share in cents.
+     * Ensures that the sum of all shares equals totalCents exactly.
+     */
+    function distributeCentsEvenly(totalCents, participantIds) {
+      if (participantIds.length === 0) return {};
+
+      const baseShare = Math.floor(totalCents / participantIds.length);
+      const remainder = totalCents - (baseShare * participantIds.length);
+
+      const shares = {};
+      participantIds.forEach((pid, index) => {
+        // Give the remainder cents to the first N participants (1 cent each)
+        shares[pid] = baseShare + (index < remainder ? 1 : 0);
+      });
+
+      return shares;
     }
 
     // ============================================
@@ -457,7 +486,9 @@
 
       // Update payers if needed
       delete state.restaurant.payers[id];
-      delete state.groupExpense.payers[id];
+      state.groupExpense.items.forEach(item => {
+        if (item.payers) delete item.payers[id];
+      });
       state.trip.lodgingItems.forEach(item => {
         delete item.payers[id];
       });
@@ -683,6 +714,10 @@
             </div>
             <span class="item-error" id="group-expense-item-error-${item.id}">${item.participants.length === 0 ? 'Select at least one person' : ''}</span>
           </div>
+          <div class="item-payers" data-item-id="${item.id}">
+            <span class="participants-label">Paid by:</span>
+            <div class="payer-bubble-group" id="group-expense-payers-${item.id}"></div>
+          </div>
         </div>
       `).join('');
 
@@ -745,16 +780,23 @@
           updateGroupExpenseTotals();
         });
       });
+
+      // Render payer bubbles for each group expense item
+      state.groupExpense.items.forEach(item => {
+        renderItemPayerBubbles(`group-expense-payers-${item.id}`, item.payers, updateGroupExpenseTotals);
+      });
     }
 
     function addGroupExpenseItem() {
       const id = nextGroupExpenseItemId++;
+      const firstPersonId = state.people[0]?.id || 0;
       state.groupExpense.items.push({
         id,
         name: '',
         amount: 0,
         qty: 1,
-        participants: state.people.map(p => p.id)
+        participants: state.people.map(p => p.id),
+        payers: { [firstPersonId]: 0 }
       });
       renderGroupExpenseItems();
     }
@@ -1039,9 +1081,9 @@
       state.restaurant.items.forEach(item => {
         if (item.participants.length === 0 || !item.amount) return;
         const totalItemCents = Math.round(item.amount * (item.qty || 1) * 100);
-        const sharePerPerson = Math.round(totalItemCents / item.participants.length);
-        item.participants.forEach(pid => {
-          owedCents[pid] = (owedCents[pid] || 0) + sharePerPerson;
+        const shares = distributeCentsEvenly(totalItemCents, item.participants);
+        Object.entries(shares).forEach(([pid, share]) => {
+          owedCents[parseInt(pid)] = (owedCents[parseInt(pid)] || 0) + share;
         });
       });
 
@@ -1050,17 +1092,31 @@
         const taxTipCents = Math.round(state.restaurant.taxTipAmount * 100);
 
         if (state.restaurant.taxTipMethod === 'equal') {
-          const perPerson = Math.round(taxTipCents / state.people.length);
-          state.people.forEach(p => {
-            owedCents[p.id] += perPerson;
+          const peopleIds = state.people.map(p => p.id);
+          const taxShares = distributeCentsEvenly(taxTipCents, peopleIds);
+          Object.entries(taxShares).forEach(([pid, share]) => {
+            owedCents[parseInt(pid)] += share;
           });
         } else {
           // Proportional to subtotal
           const totalSubtotalCents = Object.values(owedCents).reduce((a, b) => a + b, 0);
           if (totalSubtotalCents > 0) {
-            state.people.forEach(p => {
+            // Calculate proportional shares and track remainder
+            let remainingTaxTip = taxTipCents;
+            const proportionalShares = state.people.map(p => {
               const proportion = owedCents[p.id] / totalSubtotalCents;
-              owedCents[p.id] += Math.round(taxTipCents * proportion);
+              const share = Math.floor(taxTipCents * proportion);
+              remainingTaxTip -= share;
+              return { id: p.id, share, proportion };
+            });
+
+            // Sort by proportion descending to give remainder to those with highest proportion
+            proportionalShares.sort((a, b) => b.proportion - a.proportion);
+
+            // Distribute remainder
+            proportionalShares.forEach((ps, index) => {
+              const extraCent = index < remainingTaxTip ? 1 : 0;
+              owedCents[ps.id] += ps.share + extraCent;
             });
           }
         }
@@ -1077,9 +1133,9 @@
       state.groupExpense.items.forEach(item => {
         if (item.participants.length === 0 || !item.amount) return;
         const totalItemCents = Math.round(item.amount * (item.qty || 1) * 100);
-        const sharePerPerson = Math.round(totalItemCents / item.participants.length);
-        item.participants.forEach(pid => {
-          owedCents[pid] = (owedCents[pid] || 0) + sharePerPerson;
+        const shares = distributeCentsEvenly(totalItemCents, item.participants);
+        Object.entries(shares).forEach(([pid, share]) => {
+          owedCents[parseInt(pid)] = (owedCents[parseInt(pid)] || 0) + share;
         });
       });
 
@@ -1094,18 +1150,19 @@
       state.trip.lodgingItems.forEach(item => {
         if (item.participants.length === 0 || !item.amount) return;
         const totalCents = Math.round(item.amount * 100);
-        const sharePerPerson = Math.round(totalCents / item.participants.length);
-        item.participants.forEach(pid => {
-          owedCents[pid] = (owedCents[pid] || 0) + sharePerPerson;
+        const shares = distributeCentsEvenly(totalCents, item.participants);
+        Object.entries(shares).forEach(([pid, share]) => {
+          owedCents[parseInt(pid)] = (owedCents[parseInt(pid)] || 0) + share;
         });
       });
 
       // Shared items
       state.trip.sharedItems.forEach(item => {
         if (item.participants.length === 0 || !item.amount) return;
-        const sharePerPerson = Math.round((item.amount * 100) / item.participants.length);
-        item.participants.forEach(pid => {
-          owedCents[pid] = (owedCents[pid] || 0) + sharePerPerson;
+        const totalCents = Math.round(item.amount * 100);
+        const shares = distributeCentsEvenly(totalCents, item.participants);
+        Object.entries(shares).forEach(([pid, share]) => {
+          owedCents[parseInt(pid)] = (owedCents[parseInt(pid)] || 0) + share;
         });
       });
 
@@ -1136,33 +1193,30 @@
           });
         } else {
           // Split evenly among selected payers
-          const perPayer = Math.round(totalCents / payerIds.length);
-          payerIds.forEach(pid => {
-            paidCents[pid] = perPayer;
+          const shares = distributeCentsEvenly(totalCents, payerIds);
+          Object.entries(shares).forEach(([pid, share]) => {
+            paidCents[parseInt(pid)] = share;
           });
         }
       } else if (state.scenario === 'group-expense') {
-        const totalCents = state.groupExpense.items.reduce((sum, item) =>
-          sum + Math.round((item.amount || 0) * (item.qty || 1) * 100), 0);
+        // Group expense - each item has its own payers
+        state.groupExpense.items.forEach(item => {
+          const totalCents = Math.round((item.amount || 0) * (item.qty || 1) * 100);
+          const payerIds = Object.keys(item.payers || {}).map(Number);
+          if (payerIds.length === 0 || totalCents === 0) return;
 
-        // Distribute payment among payers
-        const payerIds = Object.keys(state.groupExpense.payers).map(Number);
-        if (payerIds.length === 0) return paidCents;
-
-        // Check if specific amounts are entered
-        const totalSpecified = Object.values(state.groupExpense.payers).reduce((a, b) => a + (b || 0), 0);
-        if (totalSpecified > 0) {
-          // Use specified amounts
-          payerIds.forEach(pid => {
-            paidCents[pid] = Math.round((state.groupExpense.payers[pid] || 0) * 100);
-          });
-        } else {
-          // Split evenly among selected payers
-          const perPayer = Math.round(totalCents / payerIds.length);
-          payerIds.forEach(pid => {
-            paidCents[pid] = perPayer;
-          });
-        }
+          const totalSpecified = Object.values(item.payers || {}).reduce((a, b) => a + (b || 0), 0);
+          if (totalSpecified > 0) {
+            payerIds.forEach(pid => {
+              paidCents[pid] = (paidCents[pid] || 0) + Math.round((item.payers[pid] || 0) * 100);
+            });
+          } else {
+            const shares = distributeCentsEvenly(totalCents, payerIds);
+            Object.entries(shares).forEach(([pid, share]) => {
+              paidCents[parseInt(pid)] = (paidCents[parseInt(pid)] || 0) + share;
+            });
+          }
+        });
       } else {
         // Trip - each item has its own payers
         state.trip.lodgingItems.forEach(item => {
@@ -1176,9 +1230,9 @@
               paidCents[pid] = (paidCents[pid] || 0) + Math.round((item.payers[pid] || 0) * 100);
             });
           } else {
-            const perPayer = Math.round(totalCents / payerIds.length);
-            payerIds.forEach(pid => {
-              paidCents[pid] = (paidCents[pid] || 0) + perPayer;
+            const shares = distributeCentsEvenly(totalCents, payerIds);
+            Object.entries(shares).forEach(([pid, share]) => {
+              paidCents[parseInt(pid)] = (paidCents[parseInt(pid)] || 0) + share;
             });
           }
         });
@@ -1194,9 +1248,9 @@
               paidCents[pid] = (paidCents[pid] || 0) + Math.round((item.payers[pid] || 0) * 100);
             });
           } else {
-            const perPayer = Math.round(totalCents / payerIds.length);
-            payerIds.forEach(pid => {
-              paidCents[pid] = (paidCents[pid] || 0) + perPayer;
+            const shares = distributeCentsEvenly(totalCents, payerIds);
+            Object.entries(shares).forEach(([pid, share]) => {
+              paidCents[parseInt(pid)] = (paidCents[parseInt(pid)] || 0) + share;
             });
           }
         });
@@ -1338,8 +1392,7 @@
 
       // Reset group expense
       state.groupExpense = {
-        items: [{ id: 0, name: '', amount: 0, qty: 1, participants: [0, 1] }],
-        payers: { 0: 0 }
+        items: [{ id: 0, name: '', amount: 0, qty: 1, participants: [0, 1], payers: { 0: 0 } }]
       };
       nextGroupExpenseItemId = 1;
 
@@ -1402,7 +1455,6 @@
 
     function updateAllUI() {
       renderPayerBubbles('restaurant-payers', state.restaurant.payers, updateRestaurantTotals);
-      renderPayerBubbles('group-expense-payers', state.groupExpense.payers, updateGroupExpenseTotals);
       renderRestaurantItems();
       renderGroupExpenseItems();
       renderLodgingItems();
@@ -1476,6 +1528,45 @@
     // Reset button
     if (resetBtn) {
       resetBtn.addEventListener('click', resetFairSplit);
+    }
+
+    // Copy fair split result button
+    const copyFairSplitBtn = $('copy-fair-split-result');
+    if (copyFairSplitBtn) {
+      copyFairSplitBtn.addEventListener('click', () => {
+        // Generate text summary from current results
+        const summaryRows = summaryTable.querySelectorAll('tbody tr');
+        const settlementItems = settlementsList.querySelectorAll('li');
+
+        let text = '📊 Bill Split Summary\n';
+        text += '─────────────────\n';
+
+        // Add summary
+        summaryRows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 4) {
+            const name = cells[0].textContent;
+            const owed = cells[1].textContent;
+            const paid = cells[2].textContent;
+            const net = cells[3].textContent;
+            text += `${name}: Owed ${owed}, Paid ${paid}, Net ${net}\n`;
+          }
+        });
+
+        text += '\n💸 Settlement Plan\n';
+        text += '─────────────────\n';
+
+        // Add settlements
+        settlementItems.forEach(item => {
+          // Extract text content without HTML
+          const itemText = item.textContent.trim();
+          text += `• ${itemText}\n`;
+        });
+
+        text += '\n📱 Calculate your own split at splitbillsfairly.com';
+
+        copyToClipboard(text, copyFairSplitBtn);
+      });
     }
 
     // ============================================
