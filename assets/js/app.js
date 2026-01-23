@@ -1549,7 +1549,7 @@
             const owed = cells[1].textContent;
             const paid = cells[2].textContent;
             const net = cells[3].textContent;
-            text += `${name}: Owed ${owed}, Paid ${paid}, Net ${net}\n`;
+            text += `${name}: Owes ${owed}, Paid ${paid}, Net ${net}\n`;
           }
         });
 
