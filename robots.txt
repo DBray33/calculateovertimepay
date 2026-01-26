@@ -5,6 +5,3 @@ Allow: /
 
 # Sitemap location
 Sitemap: https://splitbillsfairly.com/sitemap.xml
-
-# Disallow embed page from search results
-Disallow: /embed/
