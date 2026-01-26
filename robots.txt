@@ -1,10 +1,10 @@
-# robots.txt for splitbillsfairly.netlify.app
+# robots.txt for splitbillsfairly.com
 
 User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://splitbillsfairly.netlify.app/sitemap.xml
+Sitemap: https://splitbillsfairly.com/sitemap.xml
 
 # Disallow embed page from search results
 Disallow: /embed/
