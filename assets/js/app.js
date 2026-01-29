@@ -271,7 +271,7 @@
             weeksInTimeframe = 2;
             break;
           case 'month':
-            weeksInTimeframe = 52 / 12; // ~4.33 weeks
+            weeksInTimeframe = 4; // Standard 160 hours/month (4 weeks × 40 hours)
             break;
           case 'annual':
             weeksInTimeframe = 52;
